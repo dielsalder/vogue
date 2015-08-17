@@ -2,6 +2,7 @@ import sys
 sys.path.append('./libtcod-1.5.1')
 import libtcodpy as libtcod
 import math
+import textwrap
 
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 50
@@ -102,21 +103,22 @@ class Fighter:
         self.death_function = death_function
 
     def take_damage(self, damage):
-        if damage > 0:
+        if self.hp > 0:
             self.hp -= damage
 
-        elif damage <= 0:
-            function = self.death_function
-            if function is not None:
-                function(self.owner)
+            # check for death - if there's a death function, call it
+            if self.hp<= 0:
+                function = self.death_function
+                if function is not None:
+                    function(self.owner)
 
     def attack(self, target):
         damage = self.power - target.fighter.defense
         if damage > 0:
-            print "The " + self.owner.name + " attacks the " + target.name + "!"
+            message("The " + self.owner.name + " attacks the " + target.name + "!")
             target.fighter.take_damage(damage)
         else:
-            print "The " + self.owner.name + "'s attack bounces off!"
+            message("The " + self.owner.name + "'s attack bounces off!")
 
 class BasicMonster:
     # AI for a basic monster
@@ -132,6 +134,11 @@ class BasicMonster:
             elif player.fighter.hp > 0:
                 monster.fighter.attack(player)
 
+class PlayerAI:
+    # controls things that happen to the player on each turn
+    def take_turn(self):
+        player = player
+        pass
 
 class Rect:
     # a rectangle on the map, used for a room
@@ -277,45 +284,6 @@ def place_objects(room):
             num_monsters += 1
             objects.append(monster)
 
-def render_all():
-    # draw everything
-    global fov_recompute
-
-    for object in objects:
-        if object != player:
-            object.draw()
-    player.draw()
-
-    for y in range(MAP_HEIGHT):
-        for x in range(MAP_WIDTH):
-            visible = libtcod.map_is_in_fov(fov_map, x, y)
-            wall = map[x][y].block_sight
-            if not visible:
-                if map[x][y].explored:
-                    if wall:
-                        libtcod.console_set_char_background(con, x, y, color_dark_wall, libtcod.BKGND_SET)
-                    else:
-                        libtcod.console_set_char_background(con, x, y, color_dark_ground, libtcod.BKGND_SET)
-            else:
-                if wall:
-                    libtcod.console_set_char_background(con, x, y, color_light_wall, libtcod.BKGND_SET)
-                else:
-                    libtcod.console_set_char_background(con, x, y, color_light_ground, libtcod.BKGND_SET)
-                map[x][y].explored = True
-
-    if fov_recompute:
-        # recompute FOV if needed
-        fov_recompute = False
-        libtcod.map_compute_fov(fov_map, player.x, player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO)
-
-    # blit to root console
-    libtcod.console_blit(con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 0)
-
-    #show the player's stats
-    libtcod.console_set_default_foreground(con, libtcod.white)
-    libtcod.console_print_ex(0, 1, SCREEN_HEIGHT - 2, libtcod.BKGND_NONE, libtcod.LEFT,
-           'HP: ' + str(player.fighter.hp) + '/' + str(player.fighter.max_hp))
-
 def handle_keys():
     global fov_recompute
     key = libtcod.console_wait_for_keypress(True)
@@ -370,32 +338,139 @@ def player_move_or_attack(dx, dy):
         fov_recompute = True
 
 def player_death(player):
-    global game_state
-    print "You died!"
-    game_state = "dead"
-
+    # game over
     player.char = '%'
-    player.color = libtcod.dark_red
+
+    global game_state
+    game_state = 'dead'
+    message( 'You died!')
+
 
 def monster_death(monster):
-    print "The " + monster.name + " dies!"
+    message( "The " + monster.name + " dies!")
     monster.char = '%'
-    monster.block = False
     monster.ai = None
+    monster.blocks = False
     monster.fighter = None
     monster.name = monster.name + ' corpse'
     monster.send_to_back()
 
+################################
+# GUI                          #
+################################
+
+def render_bar(x, y, w, h, name, value, maximum, bar_color, back_color):
+    # width of bar on screen
+    bar_width = (w * value) / maximum
+
+    # render background
+    libtcod.console_set_default_background(panel, back_color)
+    libtcod.console_rect(panel, x, y, w, h, False, libtcod.BKGND_SCREEN)
+
+    # render bar
+    libtcod.console_set_default_background(panel, bar_color)
+    if bar_width > 0:
+        libtcod.console_rect(panel, x, y, bar_width, h,
+                False, libtcod.BKGND_SCREEN)
+
+    # render label
+    label = name + ": " + str(value) + "\/" + str(maximum)
+    libtcod.console_set_default_foreground(panel, libtcod.white)
+    # (console, x, y, background flag, alignment, string)
+    libtcod.console_print_ex(panel, x + w / 2, y,
+            libtcod.BKGND_NONE, libtcod.CENTER, label)
+
+def message(new_msg, color = libtcod.white):
+    # split message if necessary
+    new_msg_lines = textwrap.wrap(new_msg, MSG_WIDTH)
+
+    for line in new_msg_lines:
+        if len(game_msgs) == MSG_HEIGHT:
+            del game_msgs[0]
+        game_msgs.append( (line, color) )
+
+def render_all():
+    # draw everything
+    global fov_recompute
+
+    for object in objects:
+        if object != player:
+            object.draw()
+    # player is always drawn last i.e. on top
+    player.draw()
+
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            visible = libtcod.map_is_in_fov(fov_map, x, y)
+            wall = map[x][y].block_sight
+            if not visible:
+                if map[x][y].explored:
+                    if wall:
+                        libtcod.console_set_char_background(con, x, y, color_dark_wall, libtcod.BKGND_SET)
+                    else:
+                        libtcod.console_set_char_background(con, x, y, color_dark_ground, libtcod.BKGND_SET)
+            else:
+                if wall:
+                    libtcod.console_set_char_background(con, x, y, color_light_wall, libtcod.BKGND_SET)
+                else:
+                    libtcod.console_set_char_background(con, x, y, color_light_ground, libtcod.BKGND_SET)
+                map[x][y].explored = True
+
+    if fov_recompute:
+        # recompute FOV if needed
+        fov_recompute = False
+        libtcod.map_compute_fov(fov_map, player.x, player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO)
+
+    # blit to root console
+    libtcod.console_blit(con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 0)
+
+    # render HUD
+    libtcod.console_set_default_background(panel, libtcod.black)
+    libtcod.console_clear(panel)
+    render_bar(1, 1, BAR_WIDTH, BAR_HEIGHT, 'HP',
+            player.fighter.hp, player.fighter.max_hp, libtcod.light_red, libtcod.darker_red)
+
+    # message log
+    y = 1
+    for (line, color) in game_msgs:
+        libtcod.console_set_default_foreground(panel, color)
+        libtcod.console_print_ex(panel, MSG_X, y, libtcod.BKGND_NONE, libtcod.LEFT, line)
+        y += 1
+
+    libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, PANEL_Y)
+
+
+
 fighter_component = Fighter(hp=30, defense=2, power=5, death_function=player_death)
-player = Object(0, 0, '@', 'player', libtcod.white,
-        blocks=True, fighter=fighter_component)
+player = Object(0, 0, '@', 'player', libtcod.white, blocks=True, fighter=fighter_component)
+
 objects = [player]
 
+
+
+# Set up display
 libtcod.console_set_custom_font('consolas10x10.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
 libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'python/vogue', False)
 
 # Create off-screen console
 con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
+
+# Set up HUD
+PANEL_HEIGHT = 7
+PANEL_Y = SCREEN_HEIGHT - PANEL_HEIGHT
+BAR_WIDTH = 20
+BAR_HEIGHT = 1
+panel = libtcod.console_new(SCREEN_WIDTH, PANEL_HEIGHT)
+
+# Set up message log
+MSG_X = BAR_WIDTH + 2
+MSG_WIDTH = SCREEN_WIDTH - BAR_WIDTH - 2
+MSG_HEIGHT = PANEL_HEIGHT - 1
+
+# List of messages
+game_msgs = []
+
+message('Welcome to the kobold hole.', libtcod.green)
 
 libtcod.sys_set_fps(LIMIT_FPS)
 
@@ -408,16 +483,13 @@ for y in range(MAP_HEIGHT):
 global fov_recompute
 fov_recompute = True
 
-global game_state
 game_state = "playing"
 global player_action
 player_action = None
 
 
-
 # Main loop
 while not libtcod.console_is_window_closed():
-    libtcod.console_set_default_foreground(con, libtcod.white)
 
     render_all()
 
