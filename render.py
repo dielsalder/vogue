@@ -1,6 +1,7 @@
 import libtcodpy as libtcod
 import screen
 import game_map
+import entity
 
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 50
@@ -17,6 +18,11 @@ def draw_map(con):
             tile = game_map.level_map[x][y]
             tile.drawer.draw(con, x, y)
 
+def draw_entities(con):
+    """ Draw all entities on con"""
+    for e in entity.entities:
+        e.drawer.draw(con)
+
 def display(con):
     """
     Display con on root console
@@ -27,4 +33,5 @@ def display(con):
 
 def draw_all():
     draw_map(con)
+    draw_entities(con)
     display()
