@@ -23,6 +23,10 @@ def draw_entities(con):
     for e in entity.entities:
         e.drawer.draw(con)
 
+def draw_player(con):
+    """ Draw player"""
+    entity.player.draw(con)
+
 def display(con):
     """
     Display con on root console
@@ -34,4 +38,5 @@ def display(con):
 def draw_all():
     draw_map(con)
     draw_entities(con)
+    draw_player(con)
     display()

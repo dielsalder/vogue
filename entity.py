@@ -1,7 +1,9 @@
 import libtcodpy as libtcod
 
+MAX_ITEMS = 20
+
 class Entity:
-    """ Any object (player, NPCs, items, dungeon feature s"""
+    """ Any object (player, NPCs, items, dungeon features """
     def __init__(self, x, y, name, drawer, blocks = False):
         self.x = x
         self.y = y
@@ -26,8 +28,20 @@ class EntityDrawer:
         libtcod.console_set_default_foreground(con, self.fg)
         libtcod.console_put_char(con, x, y, self.char, libtcod.BKGND_NONE)
 
+def generate_items():
+    """
+    Generate list of all items on level which is passed to place_items
+    can expand to gen_potions(), gen_monsters(), etc
+    """
+
+    global items
+
 # data
 player_drawer = EntityDrawer("@", libtcod.white)
-player = Entity(0, 0, 'player', player_drawer, blocks = True)
+player = Entity(40, 40, 'player', player_drawer, blocks = True)
 
+global entities
 entities = []
+
+global items
+items = []
