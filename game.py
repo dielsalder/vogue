@@ -1,4 +1,5 @@
 import sys
+import shelve
 sys.path.append('./libtcod')
 import libtcodpy as libtcod
 import math
@@ -22,7 +23,7 @@ MSG_HEIGHT = PANEL_HEIGHT - 1
 
 LIMIT_FPS = 20
 
-FOV_ALGO = 0    # default FOV algorithm
+FOV_ALGO = 0    # libtcod default FOV algorithm
 FOV_LIGHT_WALLS = True
 TORCH_RADIUS = 10
 
@@ -221,7 +222,8 @@ def create_room(room):
             map[x][y].block_sight = False
 
 def make_map():
-    global map
+    global map, objects
+    objects = [player]
 
     ROOM_MAX_SIZE = 10
     ROOM_MIN_SIZE = 6
@@ -330,13 +332,13 @@ def place_monsters(room):
             if libtcod.random_get_int(0, 0, 100) <= 60:
                 fighter_component = Fighter(hp=10, defense=0, power=3, death_function=monster_death)
                 ai_component = BasicMonster()
-                monster = Object(x, y, 'o', 'orc', libtcod.desaturated_green,
+                monster = Object(x, y, 'd', 'dog', libtcod.desaturated_green,
                         blocks = True, fighter=fighter_component, ai=ai_component)
 
             else:
                 fighter_component = Fighter(hp=16, defense=0, power=3)
                 ai_component = BasicMonster()
-                monster = Object(x, y, 'T', 'troll', libtcod.desaturated_green,
+                monster = Object(x, y, 'T', 'tiger', libtcod.desaturated_green,
                         blocks = True, fighter=fighter_component, ai=ai_component)
 
             num_monsters += 1
@@ -471,6 +473,11 @@ def menu(header, options, width):
     if len(options) > 26: raise ValueError('Cannot have a menu with more than 26 options')
 
     header_height = libtcod.console_get_height_rect(con, 0, 0, width, SCREEN_HEIGHT, header)
+
+    # check for empty header
+    if header == '':
+        header_height = 0
+
     height = len(options) + header_height
 
     window = libtcod.console_new(width, height)
@@ -595,67 +602,138 @@ def render_all():
 
     libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, PANEL_Y)
 
+def msgbox(text, width=50):
+    menu(text, [], width)
 
+def main_menu():
+    libtcod.console_print_ex(0, SCREEN_WIDTH/2, SCREEN_HEIGHT/2-4,
+            libtcod.BKGND_NONE, libtcod.CENTER, "Kobold Hole")
+    while not libtcod.console_is_window_closed():
+        choice = menu('', ['New game', 'Continue game', 'Quit'], 24)
 
-fighter_component = Fighter(hp=30, defense=2, power=5, death_function=player_death)
-player = Object(0, 0, '@', 'player', libtcod.white, blocks=True, fighter=fighter_component)
+        if choice == 0:
+            new_game()
+            play_game()
+        if choice == 1:
+            try:
+                load_game()
+                play_game
+            except:
+                msgbox('\n No saved game to load.\n', 24)
+                continue
+        if choice == 2:
+            break
 
-objects = [player]
+# does not work
+def pause_menu():
+    while not libtcod.console_is_window_closed():
+        choice = menu('', ['Continue', 'Save', 'Quit without saving'], 24)
+        if choice == 0:
+            break
+        elif choice == 1:
+            save_game()
+            # todo: check for existing save
+        elif choice == 2:
+            break
 
-inventory = []
+################################
+# Game engine                  #
+################################
 
-# Set up display
+def new_game():
+    global player, inventory, game_msgs, game_state
+    fighter_component = Fighter(hp=30, defense=2, power=5, death_function=player_death)
+    player = Object(0, 0, '@', 'player', libtcod.white, blocks=True, fighter=fighter_component)
+
+    make_map()
+    initialize_fov()
+
+    game_state = "playing"
+    inventory = []
+
+    # List of messages
+    game_msgs = []
+
+    message('Welcome to Kobold Hole.', libtcod.green)
+
+def initialize_fov():
+    global fov_recompute, fov_map
+    libtcod.console_clear(con)
+    fov_recompute = True
+
+    fov_map = libtcod.map_new(MAP_WIDTH, MAP_HEIGHT)
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            libtcod.map_set_properties(fov_map, x, y, not map[x][y].block_sight, not map[x][y].blocked)
+
+def play_game():
+    global player_action
+    player_action = None
+
+    global key, mouse
+    key = libtcod.Key()
+    mouse = libtcod.Mouse()
+
+    # Main loop
+    while not libtcod.console_is_window_closed():
+
+        libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS|libtcod.EVENT_MOUSE,key,mouse)
+
+        render_all()
+
+        # "flush" i.e. present changes to screen
+        libtcod.console_flush()
+
+        # clear character at last position
+        for object in objects:
+            object.clear()
+
+        player_action = handle_keys()
+        if player_action == 'exit':
+            save_game()
+            break
+
+        if game_state == 'playing' and player_action != 'didnt-take-turn':
+            for object in objects:
+                if object.ai:
+                    object.ai.take_turn()
+
+def save_game():
+    # open new empty shelve to write game data
+    file = shelve.open('savegame', 'n')
+    # repeat for all state variables
+    file['map'] = map
+    file['objects'] = objects
+    # avoid loading two player objects: shelve doesn't keep shared references
+    file['player_index'] = objects.index(player)
+    file['inventory'] = inventory
+    file['game_msgs'] = game_msgs
+    file['game_state'] = game_state
+    file.close()
+
+def load_game():
+    #open the previously saved shelve and load the game data
+    global map, objects, player, inventory, game_msgs, game_state
+
+    file = shelve.open('savegame', 'r')
+    map = file['map']
+    objects = file['objects']
+    player = objects[file['player_index']]  #get index of player in objects list and access it
+    inventory = file['inventory']
+    game_msgs = file['game_msgs']
+    game_state = file['game_state']
+    file.close()
+
+    initialize_fov()
 libtcod.console_set_custom_font('consolas10x10.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
 libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'python/vogue', False)
 
 # Create off-screen console
 con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
 
-# Set up HUD
+# HUD off-screen console
 panel = libtcod.console_new(SCREEN_WIDTH, PANEL_HEIGHT)
-
-# List of messages
-game_msgs = []
-
-message('Welcome to the kobold hole.', libtcod.green)
 
 libtcod.sys_set_fps(LIMIT_FPS)
 
-make_map()
-
-fov_map = libtcod.map_new(MAP_WIDTH, MAP_HEIGHT)
-for y in range(MAP_HEIGHT):
-    for x in range(MAP_WIDTH):
-        libtcod.map_set_properties(fov_map, x, y, not map[x][y].block_sight, not map[x][y].blocked)
-global fov_recompute
-fov_recompute = True
-
-game_state = "playing"
-global player_action
-player_action = None
-
-key = libtcod.Key()
-mouse = libtcod.Mouse()
-
-# Main loop
-while not libtcod.console_is_window_closed():
-
-    libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS|libtcod.EVENT_MOUSE,key,mouse)
-
-    render_all()
-
-    # "flush" i.e. present changes to screen
-    libtcod.console_flush()
-
-    # clear character at last position
-    for object in objects:
-        object.clear()
-
-    player_action = handle_keys()
-    if player_action == 'exit':
-        break
-
-    if game_state == 'playing' and player_action != 'didnt-take-turn':
-        for object in objects:
-            if object.ai:
-                object.ai.take_turn()
+main_menu()
