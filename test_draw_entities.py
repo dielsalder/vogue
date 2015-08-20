@@ -3,13 +3,11 @@ import render
 import game_map
 import entity
 
-potion_drawer = entity.EntityDrawer("!", libtcod.violet)
-potion = entity.Entity(20, 20, 'potion', potion_drawer)
-entity.entities = [potion]
-
 game_map.make_map()
 render.draw_map(render.con)
-render.draw_entities(render.con)
+entity.populate_items(game_map.level_map)
+
+render.draw_items(render.con)
 render.display(render.con)
 
 a = input()

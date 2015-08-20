@@ -139,12 +139,12 @@ def make_map():
 def create_h_tunnel(x1, x2, y):
     global level_map
     for x in range(min(x1, x2), max(x1, x2) + 1):
-        level_map[x][y] = floor
+        level_map[x][y] = hallway_floor
 
 def create_v_tunnel(y1, y2, x):
     global level_map
     for y in range(min(y1, y2), max(y1, y2) + 1):
-        level_map[x][y] = floor
+        level_map[x][y] = hallway_floor
 
 def is_blocked(x, y):
     # test map tile
@@ -200,5 +200,10 @@ default_drawer = TileDrawer(libtcod.red, libtcod.red)
 rock_drawer = TileDrawer(color_light_wall, color_dark_wall)
 rock = Tile(True, rock_drawer)
 
+wall = rock
+
 floor_drawer = TileDrawer(color_light_ground, color_dark_ground)
 floor = Tile(False, floor_drawer, block_sight = False)
+
+hallway_floor = floor
+room_floor = floor
