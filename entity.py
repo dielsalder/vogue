@@ -1,5 +1,6 @@
 import libtcodpy as libtcod
 import game_map
+import copy
 
 MAX_LEVEL_ITEMS = 20
 
@@ -20,12 +21,14 @@ class EntityDrawer:
         self.bg = bg
 
     def draw(self, con):
+        #print "Drawing {0}".format(self.owner.name)
         x = self.owner.x
         y = self.owner.y
         if self.bg:
             libtcod.console_set_char_background(con, x, y, self.fg)
         libtcod.console_set_default_foreground(con, self.fg)
         libtcod.console_put_char(con, x, y, self.char, libtcod.BKGND_NONE)
+        #print "Drew {0} at x = {1}; y = {2}".format(self.owner.name,x, y)
 
 class Item(Entity):
     def __init__(self, name, drawer, blocks = False):
@@ -40,18 +43,30 @@ def generate_items(max_items):
     """
     items = []
     d = 5       # greatest possible difference from max
+    i = 0
     num_items = libtcod.random_get_int(0, max_items - d, max_items)
     for i in range(num_items):
-        item = garbage
+        item = copy.deepcopy(garbage)
+        item.name = "garbage" + str(i)
+        i+= 1
         items.append(item)
-        print "Generated item: " + item.name
+        #print "Generated item: " + items[-1].name
+
+    #print "\nGenerated these items: "
+    #for item in items:
+        #print item.name
+
     return items
 
 def place_items(unplaced_items, level_map):
     global items
     """
-    Place items randomly into allowed map cells
+    Place list of items randomly into allowed map cells
     """
+
+   ##print "Placing items:"
+   #for item in unplaced_items:
+   #    #print item.name
 
     for item in unplaced_items:
         # Find a map cell where an item can be placed
@@ -61,17 +76,18 @@ def place_items(unplaced_items, level_map):
             y = libtcod.random_get_int(0, 1, game_map.MAP_HEIGHT - 1)
             # Not in hallways, please
             allowed = level_map[x][y] == game_map.floor
-            print allowed
+            #print allowed
 
         item.x = x
         item.y = y
         items.append(item)
-        print "Placed item: " + item.name
+        #print "Placed {0} at ({1}, {2})".format(item.name, item.x, item.y)
 
 def populate_items(level_map):
     """ Populate level map with items """
     new_items = generate_items(MAX_LEVEL_ITEMS)
     place_items(new_items, game_map.level_map)
+    global items
 
 global entities
 entities = []

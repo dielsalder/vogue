@@ -7,7 +7,5 @@ game_map.make_map()
 render.draw_map(render.con)
 entity.populate_items(game_map.level_map)
 
-render.draw_items(render.con)
-render.display(render.con)
-
+render.draw_all()
 a = input()

@@ -1,5 +1,6 @@
 import libtcodpy as libtcod
 import screen
+import copy
 
 MAP_WIDTH = 80
 MAP_HEIGHT = 45
@@ -200,10 +201,10 @@ default_drawer = TileDrawer(libtcod.red, libtcod.red)
 rock_drawer = TileDrawer(color_light_wall, color_dark_wall)
 rock = Tile(True, rock_drawer)
 
-wall = rock
+wall = copy.deepcopy(rock)
 
 floor_drawer = TileDrawer(color_light_ground, color_dark_ground)
 floor = Tile(False, floor_drawer, block_sight = False)
 
-hallway_floor = floor
-room_floor = floor
+hallway_floor = copy.deepcopy(floor)
+room_floor = copy.deepcopy(floor)

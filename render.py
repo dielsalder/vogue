@@ -25,8 +25,8 @@ def draw_entities(con):
 
 def draw_items(con):
     for i in entity.items:
+       ##print "Drawing {0} at ({1}, {2})".format(i.name, i.x, i.y)
         i.drawer.draw(con)
-        print "Drew item: " + i.name
 
 def draw_player(con):
     """ Draw player"""
@@ -44,4 +44,4 @@ def draw_all():
     draw_map(con)
     draw_items(con)
    #draw_player(con)
-    display()
+    display(con)
